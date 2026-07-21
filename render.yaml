@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: nest-mcp-learning-server
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.11.0
+      - key: MCP_AUTH_TOKEN
+        sync: false
+      - key: MCP_ALLOWED_ORIGINS
+        value: ""
