@@ -37,4 +37,31 @@ describe('JsonPlaceholderService', () => {
       'JSONPlaceholder request failed',
     );
   });
+
+  it('projects a user to the fields declared by the MCP output schema', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 1,
+          name: 'Test User',
+          username: 'tester',
+          email: 'test@example.com',
+          phone: '123',
+          website: 'example.com',
+          address: { city: 'Leanneburgh' },
+          company: { name: 'Romaguera-Crona' },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(service.getUser(1)).resolves.toEqual({
+      id: 1,
+      name: 'Test User',
+      username: 'tester',
+      email: 'test@example.com',
+      phone: '123',
+      website: 'example.com',
+    });
+  });
 });

@@ -37,7 +37,20 @@ export class JsonPlaceholderService {
   }
 
   async getUser(id: number): Promise<User> {
-    return this.getJson<User>(new URL(`/users/${id}`, this.baseUrl));
+    const user = await this.getJson<User & Record<string, unknown>>(
+      new URL(`/users/${id}`, this.baseUrl),
+    );
+
+    // JSONPlaceholder also returns address and company objects. Keep the MCP
+    // response deliberately small and exactly aligned with its output schema.
+    return {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      email: user.email,
+      phone: user.phone,
+      website: user.website,
+    };
   }
 
   private async getJson<T>(url: URL): Promise<T> {
