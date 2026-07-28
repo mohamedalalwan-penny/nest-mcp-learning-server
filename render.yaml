@@ -5,7 +5,7 @@ services:
     region: frankfurt
     plan: free
     branch: task/books-mcp-poc
-    buildCommand: npm ci && npm exec nx build api --configuration=production
+    buildCommand: npm ci --include=dev && npm exec nx build api --configuration=production
     startCommand: npm run start:prod
     healthCheckPath: /health
     envVars:
@@ -44,7 +44,7 @@ services:
     runtime: static
     name: penny-books-mcp-web-7f29
     branch: task/books-mcp-poc
-    buildCommand: npm ci && npm run build:web:render
+    buildCommand: npm ci --include=dev && npm run build:web:render
     staticPublishPath: dist/apps/web/browser
     envVars:
       - key: API_URL

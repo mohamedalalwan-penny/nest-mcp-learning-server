@@ -5,7 +5,7 @@
   "description": "A small Nx, NestJS, MongoDB, Angular, Gemini, and MCP books application.",
   "license": "MIT",
   "engines": {
-    "node": ">=22 <25"
+    "node": "22.x"
   },
   "scripts": {
     "build": "nx run-many -t build -p api web",
