@@ -1,15 +1,55 @@
 services:
   - type: web
-    name: nest-mcp-learning-server
     runtime: node
+    name: penny-books-mcp-api-7f29
+    region: frankfurt
     plan: free
-    buildCommand: npm ci && npm run build
+    branch: task/books-mcp-poc
+    buildCommand: npm ci && npm exec nx build api --configuration=production
     startCommand: npm run start:prod
     healthCheckPath: /health
     envVars:
-      - key: NODE_VERSION
-        value: 22.11.0
-      - key: MCP_AUTH_TOKEN
+      - key: NODE_ENV
+        value: production
+      - key: WEB_ORIGIN
+        value: https://penny-books-mcp-web-7f29.onrender.com
+      - key: MONGODB_URI
         sync: false
+      - key: MONGODB_DB_NAME
+        value: mcp_books_poc_render
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: SEED_DEMO_USER
+        value: "true"
+      - key: DEMO_USER_EMAIL
+        value: reader@example.com
+      - key: DEMO_USER_PASSWORD
+        sync: false
+      - key: DEMO_USER_NAME
+        value: Demo Reader
+      - key: GOOGLE_CREDS_B64
+        sync: false
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: GOOGLE_CLOUD_LOCATION
+        value: us-central1
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
       - key: MCP_ALLOWED_ORIGINS
-        value: ""
+        value: https://penny-books-mcp-web-7f29.onrender.com
+
+  - type: web
+    runtime: static
+    name: penny-books-mcp-web-7f29
+    branch: task/books-mcp-poc
+    buildCommand: npm ci && npm run build:web:render
+    staticPublishPath: dist/apps/web/browser
+    envVars:
+      - key: API_URL
+        value: https://penny-books-mcp-api-7f29.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

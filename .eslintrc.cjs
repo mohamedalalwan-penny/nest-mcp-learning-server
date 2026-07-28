@@ -6,7 +6,10 @@ module.exports = {
   },
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    project: './tsconfig.json',
+    project: [
+      './apps/api/tsconfig.app.json',
+      './apps/api/tsconfig.spec.json',
+    ],
     tsconfigRootDir: __dirname,
   },
   plugins: ['@typescript-eslint'],
@@ -15,7 +18,12 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:@typescript-eslint/recommended-requiring-type-checking',
   ],
-  ignorePatterns: ['dist', 'coverage', 'node_modules'],
+  ignorePatterns: [
+    'dist',
+    'coverage',
+    'node_modules',
+    'apps/api/webpack.config.js',
+  ],
   rules: {
     '@typescript-eslint/no-misused-promises': [
       'error',

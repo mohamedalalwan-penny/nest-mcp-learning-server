@@ -1,0 +1,164 @@
+@if (mode() === 'minimized') {
+  <button
+    class="chat-bubble"
+    type="button"
+    aria-label="Open books assistant"
+    [style.left.px]="position().x"
+    [style.top.px]="position().y"
+    (pointerdown)="startDrag($event)"
+    (click)="restoreFromBubble()"
+  >
+    <span>✦</span>
+  </button>
+} @else {
+  <section
+    class="chat-panel"
+    [class.chat-panel--maximized]="mode() === 'maximized'"
+    [style.left.px]="mode() === 'normal' ? position().x : null"
+    [style.top.px]="mode() === 'normal' ? position().y : null"
+    aria-label="Books AI assistant"
+  >
+    <header class="chat-header" (pointerdown)="startDrag($event)">
+      <div class="assistant-mark">✦</div>
+      <div class="min-w-0 flex-1">
+        <h2>Books Assistant</h2>
+        <p>Gemini connected through MCP</p>
+      </div>
+      <div class="header-actions">
+        <button
+          data-action
+          type="button"
+          title="New chat"
+          aria-label="New chat"
+          (click)="chat.clear()"
+        >
+          ↻
+        </button>
+        <button
+          data-action
+          type="button"
+          [title]="mode() === 'maximized' ? 'Restore' : 'Maximize'"
+          [attr.aria-label]="mode() === 'maximized' ? 'Restore' : 'Maximize'"
+          (click)="setMode(mode() === 'maximized' ? 'normal' : 'maximized')"
+        >
+          {{ mode() === 'maximized' ? '❐' : '□' }}
+        </button>
+        <button
+          data-action
+          type="button"
+          title="Minimize"
+          aria-label="Minimize"
+          (click)="setMode('minimized')"
+        >
+          —
+        </button>
+      </div>
+    </header>
+
+    <div
+      #timeline
+      class="chat-timeline"
+      (scroll)="timelineScrolled()"
+      aria-live="polite"
+    >
+      @if (!chat.hasMessages()) {
+        <div class="chat-welcome">
+          <div class="welcome-mark">✦</div>
+          <h3>Ask about your books</h3>
+          <p>
+            I discover the available Books API through MCP and can read or change
+            the same collection shown on this page.
+          </p>
+          <div class="suggestions">
+            <button type="button" (click)="useSuggestion('List my books as a Markdown table')">
+              List my books
+            </button>
+            <button
+              type="button"
+              (click)="useSuggestion('Which books am I currently reading?')"
+            >
+              Currently reading
+            </button>
+            <button
+              type="button"
+              (click)="useSuggestion('Explain which REST endpoints and MCP tools are available')"
+            >
+              Explain the API
+            </button>
+          </div>
+        </div>
+      }
+
+      @for (message of chat.messages(); track message.id) {
+        <article
+          class="message-row"
+          [class.message-row--user]="message.role === 'user'"
+          [class.message-row--error]="message.error"
+        >
+          <div class="message-label">
+            {{ message.role === 'user' ? 'You' : 'Books AI' }}
+          </div>
+          <div class="message-bubble">
+            @if (message.role === 'assistant') {
+              <markdown [data]="message.content" />
+            } @else {
+              <p>{{ message.content }}</p>
+            }
+            @if (message.pending) {
+              <span class="typing-dots" aria-label="Response streaming">
+                <i></i><i></i><i></i>
+              </span>
+            }
+          </div>
+        </article>
+      }
+
+      @if (chat.busy() && chat.status()) {
+        <div class="thinking-row">
+          <span class="thinking-star">✦</span>
+          <span>{{ chat.status() }}</span>
+          <span class="typing-dots"><i></i><i></i><i></i></span>
+        </div>
+      }
+    </div>
+
+    @if (!stickToBottom()) {
+      <button class="jump-button" type="button" (click)="jumpToLatest()">
+        Jump to latest ↓
+      </button>
+    }
+
+    <footer class="chat-composer">
+      <div class="composer-box">
+        <textarea
+          [(ngModel)]="prompt"
+          (keydown)="keydown($event)"
+          [disabled]="chat.busy()"
+          rows="2"
+          placeholder="Ask about your books…"
+        ></textarea>
+        @if (chat.busy()) {
+          <button
+            class="send-button send-button--stop"
+            type="button"
+            aria-label="Stop response"
+            (click)="chat.cancel()"
+          >
+            ■
+          </button>
+        } @else {
+          <button
+            class="send-button"
+            type="button"
+            aria-label="Send message"
+            [disabled]="!prompt.trim()"
+            (click)="send()"
+          >
+            ↑
+          </button>
+        }
+      </div>
+      <p class="chat-note">AI can make mistakes. Review changes to your collection.</p>
+    </footer>
+  </section>
+}
