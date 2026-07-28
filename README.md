@@ -235,11 +235,10 @@ The live verifier logs in, connects with the official MCP client, reads the docu
 - `penny-books-mcp-api-7f29`: NestJS, Swagger, Gemini orchestration, and `/mcp`;
 - `penny-books-mcp-web-7f29`: the Angular static site.
 
-The hosted API uses the same Atlas cluster URI as local development but a
-separate database:
+The hosted API and local development use the same dedicated POC Atlas database:
 
 ```dotenv
-MONGODB_DB_NAME=mcp_books_poc_render
+MONGODB_DB_NAME=mcp_books_poc
 ```
 
 Render prompts for these secrets during the initial Blueprint creation:
