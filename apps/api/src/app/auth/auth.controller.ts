@@ -1,9 +1,14 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import type { LoginResponse, User } from '@books/contracts';
 
-import { LoginDto } from './auth.dto';
+import { LoginDto, UserResponseDto } from './auth.dto';
 import { CurrentUser, JwtUser } from './auth.models';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -23,6 +28,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get the authenticated application user' })
+  @ApiOkResponse({ type: UserResponseDto })
   me(@CurrentUser() user: JwtUser): User {
     return {
       id: user.sub,

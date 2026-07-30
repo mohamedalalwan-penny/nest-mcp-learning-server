@@ -11,3 +11,14 @@ export class LoginDto {
   @MinLength(8)
   password!: string;
 }
+
+export class UserResponseDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  email!: string;
+
+  @ApiProperty()
+  displayName!: string;
+}

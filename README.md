@@ -8,7 +8,7 @@ The project is an Nx monorepo using:
 - Angular 21 and Tailwind CSS 4
 - MongoDB with Mongoose
 - JWT authentication
-- Swagger/OpenAPI
+- Nest OpenAPI schema generation
 - MCP SDK 1.29.0 with stateless Streamable HTTP
 - Google Vertex Gemini through the AI SDK
 
@@ -19,20 +19,22 @@ flowchart LR
     UI["Angular books UI"] -->|"REST + JWT"| REST["Nest BooksController"]
     Widget["Persistent Angular chatbot"] -->|"SSE + JWT"| Assistant["Nest AssistantController"]
     Assistant -->|"Streamable HTTP + same JWT"| MCP["POST /mcp"]
-    MCP --> Service["BooksService"]
-    REST --> Service
+    OpenAPI["Nest-generated operation schemas"] --> Catalog["Dynamic MCP catalog"]
+    MCP --> Catalog
+    Catalog -->|"Internal REST + same JWT"| REST
+    REST --> Service["BooksService"]
     Service --> Mongo["MongoDB: mcp_books_poc"]
-    Swagger["Generated Swagger document"] --> MCP
-    MCP --> Docs["MCP documentation resources"]
     Assistant --> Gemini["Vertex Gemini"]
 ```
 
-The important boundary is `BooksService`:
+The important boundary is the existing authenticated REST API:
 
 - REST controllers call it.
-- MCP tools call it.
-- The assistant never queries MongoDB or calls a hard-coded local function.
-- The authenticated user ID always comes from the JWT.
+- Nest generates operation schemas from the registered controllers and DTOs.
+- Those schemas automatically become MCP tool definitions.
+- MCP tools call the existing REST routes over loopback HTTP with the same JWT.
+- The normal Nest guards, pipes, interceptors, controllers, and services still execute.
+- The assistant never queries MongoDB, invokes a controller method directly, or receives the JWT.
 
 ## Workspace
 
@@ -50,15 +52,15 @@ The old JSONPlaceholder learning example was replaced by the Books domain. Its s
 
 ### Manual Books API
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/auth/login` | Obtain an application JWT |
-| `GET` | `/api/auth/me` | Read the current user |
-| `GET` | `/api/books` | Search/filter owned books |
-| `GET` | `/api/books/:id` | Read one owned book |
-| `POST` | `/api/books` | Create a book |
-| `PATCH` | `/api/books/:id` | Update a book |
-| `DELETE` | `/api/books/:id` | Delete a book |
+| Method   | Endpoint          | Purpose                   |
+| -------- | ----------------- | ------------------------- |
+| `POST`   | `/api/auth/login` | Obtain an application JWT |
+| `GET`    | `/api/auth/me`    | Read the current user     |
+| `GET`    | `/api/books`      | Search/filter owned books |
+| `GET`    | `/api/books/:id`  | Read one owned book       |
+| `POST`   | `/api/books`      | Create a book             |
+| `PATCH`  | `/api/books/:id`  | Update a book             |
+| `DELETE` | `/api/books/:id`  | Delete a book             |
 
 Swagger:
 
@@ -74,20 +76,27 @@ POST http://localhost:3000/mcp
 Authorization: Bearer <application JWT>
 ```
 
-Resources:
-
-- `books://api-docs`
-- `books://openapi.json`
-
 Tools:
 
-- `list_books`
-- `get_book`
-- `create_book`
-- `update_book`
-- `delete_book`
+- `auth_me`
+- `books_list`
+- `books_get`
+- `books_create`
+- `books_update`
+- `books_remove`
 
-The Swagger document is exposed as a resource. It is not automatically converted into unrestricted tools. The five curated tools are small adapters over `BooksService`.
+The tool list is generated from Nest's controller and DTO metadata at startup.
+Nest's OpenAPI generator supplies the schemas and also hosts the normal Swagger
+UI for developers. The same document generates a lightweight Markdown resource
+at `books://api-docs`, which the assistant reads only for API and capability
+questions. Every JWT-protected operation becomes an MCP tool by default.
+Infrastructure controllers stay out of the generated schema, while the
+assistant uses `@McpExclude()` to prevent a recursive assistant-to-assistant
+tool call.
+
+Tool inputs mirror HTTP using `path`, `query`, and `body` objects. Tool handlers
+can only call paths from the server-generated catalog; the model cannot provide
+an arbitrary URL or token.
 
 ### Persistent assistant
 
@@ -102,10 +111,12 @@ It supports:
 - minimize and maximize;
 - persisted position, mode, and recent messages;
 - cancellation;
-- MCP read and write tools available directly from chat.
+- dynamically discovered MCP read and write tools available directly from chat;
+- proactive JWT expiration detection and automatic return to login.
 
-All five curated MCP tools are available to Gemini on every turn. A write is
-reported as successful only after its MCP tool returns successfully.
+All generated MCP tools are available to Gemini on every turn. A write is
+reported as successful only after its generated MCP tool and existing REST
+endpoint return successfully.
 
 ## Local environment
 
@@ -134,6 +145,10 @@ GOOGLE_CREDS_B64=
 GOOGLE_CLOUD_PROJECT=
 GOOGLE_CLOUD_LOCATION=us-central1
 GEMINI_MODEL=gemini-2.5-flash
+
+MCP_URL=http://127.0.0.1:3000/mcp
+INTERNAL_API_URL=http://127.0.0.1:3000
+MCP_TOOL_TIMEOUT_MS=10000
 ```
 
 `.env` is ignored by Git. Use a MongoDB credential restricted to the `mcp_books_poc` database when preparing a standalone Atlas account.
@@ -194,7 +209,9 @@ npx @modelcontextprotocol/inspector
 3. Select Streamable HTTP.
 4. Enter `http://localhost:3000/mcp`.
 5. Add `Authorization: Bearer <JWT>`.
-6. Read both resources and call the five tools.
+6. List and call the six discovered tools.
+7. List resources and read `books://api-docs` to inspect the generated API
+   reference.
 
 Opening `/mcp` in a normal browser intentionally returns `405`. It is a JSON-RPC endpoint, not a webpage.
 
@@ -214,7 +231,9 @@ With the API already running:
 npm run verify:live
 ```
 
-The live verifier logs in, connects with the official MCP client, reads the documentation resource, lists tools, and performs a temporary create/update/delete cycle that it cleans up.
+The live verifier logs in, connects with the official MCP client, reads the
+generated documentation resource, lists tools, and performs a temporary
+create/update/delete cycle that it cleans up.
 
 ## Suggested demonstration
 
@@ -232,7 +251,7 @@ The live verifier logs in, connects with the official MCP client, reads the docu
 
 `render.yaml` defines two services from this monorepo:
 
-- `penny-books-mcp-api-7f29`: NestJS, Swagger, Gemini orchestration, and `/mcp`;
+- `penny-books-mcp-api-7f29`: NestJS, Gemini orchestration, and `/mcp`;
 - `penny-books-mcp-web-7f29`: the Angular static site.
 
 The hosted API and local development use the same dedicated POC Atlas database:
@@ -252,9 +271,10 @@ The Angular build receives the public API URL through `API_URL`. The generated
 `runtime-config.js` keeps local development on same-origin `/api` while pointing
 the hosted static site to the Render API.
 
-The API service uses its Render-provided `PORT` and connects to its own MCP
-endpoint over loopback. The browser origin is restricted to the deployed
-Angular URL.
+The API service binds to port `10000`, calls its authenticated REST API over
+`INTERNAL_API_URL=http://127.0.0.1:10000`, and limits each generated MCP tool
+call with `MCP_TOOL_TIMEOUT_MS=10000`. The browser origin is restricted to the
+deployed Angular URL.
 
 ## Deliberately excluded
 
@@ -264,7 +284,6 @@ To keep the learning project readable, it does not include:
 - conversation collections;
 - refresh tokens;
 - file attachments;
-- generic Swagger-to-tool conversion;
 - arbitrary URL, REST, or MongoDB tools;
 - production OAuth for external MCP clients.
 

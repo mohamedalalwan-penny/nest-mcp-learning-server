@@ -30,7 +30,16 @@ export class McpController {
     @Res() response: Response,
     @Body() body: unknown,
   ): Promise<void> {
-    const server = this.serverFactory.create(request.user);
+    const authorization = request.header('authorization');
+    if (!authorization) {
+      response.status(HttpStatus.UNAUTHORIZED).json({
+        jsonrpc: '2.0',
+        error: { code: -32001, message: 'Authentication required' },
+        id: null,
+      });
+      return;
+    }
+    const server = this.serverFactory.create(authorization);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,

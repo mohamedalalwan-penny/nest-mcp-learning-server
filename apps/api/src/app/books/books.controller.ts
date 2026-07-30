@@ -9,13 +9,21 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import type { Book, BookListResponse } from '@books/contracts';
 
 import { CurrentUser, JwtUser } from '../auth/auth.models';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
+  BookListResponseDto,
+  BookResponseDto,
   CreateBookDto,
   ListBooksQueryDto,
   UpdateBookDto,
@@ -31,6 +39,7 @@ export class BooksController {
 
   @Get()
   @ApiOperation({ summary: 'List the authenticated user’s books' })
+  @ApiOkResponse({ type: BookListResponseDto })
   list(
     @CurrentUser() user: JwtUser,
     @Query() query: ListBooksQueryDto,
@@ -40,12 +49,14 @@ export class BooksController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get one owned book' })
+  @ApiOkResponse({ type: BookResponseDto })
   get(@CurrentUser() user: JwtUser, @Param('id') id: string): Promise<Book> {
     return this.books.get(user.sub, id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a book' })
+  @ApiCreatedResponse({ type: BookResponseDto })
   create(
     @CurrentUser() user: JwtUser,
     @Body() input: CreateBookDto,
@@ -55,6 +66,7 @@ export class BooksController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update one owned book' })
+  @ApiOkResponse({ type: BookResponseDto })
   update(
     @CurrentUser() user: JwtUser,
     @Param('id') id: string,
@@ -65,6 +77,7 @@ export class BooksController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete one owned book' })
+  @ApiOkResponse({ type: BookResponseDto })
   remove(@CurrentUser() user: JwtUser, @Param('id') id: string): Promise<Book> {
     return this.books.remove(user.sub, id);
   }

@@ -45,43 +45,59 @@ if (unsupportedGetResponse.status !== 405) {
   );
 }
 
-const transport = new StreamableHTTPClientTransport(
-  new URL(`${apiUrl}/mcp`),
-  {
-    requestInit: {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    },
+const transport = new StreamableHTTPClientTransport(new URL(`${apiUrl}/mcp`), {
+  requestInit: {
+    headers: { Authorization: `Bearer ${accessToken}` },
   },
-);
+});
 const client = new Client({ name: 'books-poc-verifier', version: '1.0.0' });
 
 try {
   await client.connect(transport);
-  const tools = await client.listTools();
   const resources = await client.listResources();
-  const docs = await client.readResource({ uri: 'books://api-docs' });
+  const documentationResource = resources.resources.find(
+    (resource) => resource.uri === 'books://api-docs',
+  );
+  if (!documentationResource) {
+    throw new Error('The generated Books API documentation resource is missing');
+  }
+  const documentation = await client.readResource({
+    uri: documentationResource.uri,
+  });
+  const documentationText = documentation.contents
+    .map((content) => ('text' in content ? content.text : ''))
+    .join('\n');
+  if (
+    !documentationText.includes('books_create') ||
+    !documentationText.includes('POST /api/books')
+  ) {
+    throw new Error('The generated Books API documentation is incomplete');
+  }
+  const tools = await client.listTools();
   const created = await client.callTool({
-    name: 'create_book',
+    name: 'books_create',
     arguments: {
-      title: `MCP verification ${Date.now()}`,
-      author: 'Local verifier',
-      status: 'to_read',
+      body: {
+        title: `MCP verification ${Date.now()}`,
+        author: 'Local verifier',
+        status: 'to_read',
+      },
     },
   });
   if (created.isError) {
-    throw new Error('create_book returned an MCP error');
+    throw new Error('books_create returned an MCP error');
   }
-  const id = created.structuredContent?.book?.id;
+  const id = created.structuredContent?.data?.id;
   if (typeof id !== 'string') {
-    throw new Error('create_book did not return a book ID');
+    throw new Error('books_create did not return a book ID');
   }
   const updated = await client.callTool({
-    name: 'update_book',
-    arguments: { id, status: 'read' },
+    name: 'books_update',
+    arguments: { path: { id }, body: { status: 'read' } },
   });
   const removed = await client.callTool({
-    name: 'delete_book',
-    arguments: { id },
+    name: 'books_remove',
+    arguments: { path: { id } },
   });
   if (updated.isError || removed.isError) {
     throw new Error('The MCP update/delete verification failed');
@@ -91,13 +107,7 @@ try {
     JSON.stringify(
       {
         tools: tools.tools.map((tool) => tool.name),
-        resources: resources.resources.map((resource) => resource.uri),
-        documentationReadable: docs.contents.some(
-          (content) =>
-            'text' in content &&
-            typeof content.text === 'string' &&
-            content.text.includes('Books API'),
-        ),
+        documentation: `${documentationResource.uri} generated from OpenAPI`,
         authentication: 'unauthenticated request rejected with 401',
         unsupportedGet: 'rejected with 405',
         temporaryCrudCycle: 'passed and cleaned up',

@@ -11,6 +11,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: "10000"
       - key: WEB_ORIGIN
         value: https://penny-books-mcp-web-7f29.onrender.com
       - key: MONGODB_URI
@@ -37,6 +39,10 @@ services:
         value: us-central1
       - key: GEMINI_MODEL
         value: gemini-2.5-flash
+      - key: INTERNAL_API_URL
+        value: http://127.0.0.1:10000
+      - key: MCP_TOOL_TIMEOUT_MS
+        value: "10000"
       - key: MCP_ALLOWED_ORIGINS
         value: https://penny-books-mcp-web-7f29.onrender.com
 

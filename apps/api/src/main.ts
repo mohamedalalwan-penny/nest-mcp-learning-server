@@ -6,7 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app/app.module';
-import { ApiDocumentationService } from './app/docs/api-documentation.service';
+import { McpRouteCatalogService } from './app/mcp/mcp-route-catalog.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -33,14 +33,14 @@ async function bootstrap(): Promise<void> {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Books MCP POC')
-    .setDescription(
-      'The REST API used by both the Angular UI and the MCP capability adapter.',
-    )
     .setVersion('1.0.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  app.get(ApiDocumentationService).setDocument(document);
+  const document = SwaggerModule.createDocument(app, swaggerConfig, {
+    operationIdFactory: (controllerKey, methodKey) =>
+      `${controllerKey}_${methodKey}`,
+  });
+  app.get(McpRouteCatalogService).initialize(document);
   SwaggerModule.setup('api/docs', app, document, {
     jsonDocumentUrl: 'api/docs-json',
   });

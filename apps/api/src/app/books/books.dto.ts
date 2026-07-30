@@ -12,6 +12,40 @@ import {
 
 import { BOOK_STATUSES, BookStatus } from '@books/contracts';
 
+export class BookResponseDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  title!: string;
+
+  @ApiProperty()
+  author!: string;
+
+  @ApiPropertyOptional()
+  description?: string;
+
+  @ApiPropertyOptional()
+  publishedYear?: number;
+
+  @ApiProperty({ enum: BOOK_STATUSES })
+  status!: BookStatus;
+
+  @ApiProperty()
+  createdAt!: string;
+
+  @ApiProperty()
+  updatedAt!: string;
+}
+
+export class BookListResponseDto {
+  @ApiProperty({ type: [BookResponseDto] })
+  books!: BookResponseDto[];
+
+  @ApiProperty({ minimum: 0 })
+  total!: number;
+}
+
 export class CreateBookDto {
   @ApiProperty({ example: 'The Pragmatic Programmer' })
   @IsString()

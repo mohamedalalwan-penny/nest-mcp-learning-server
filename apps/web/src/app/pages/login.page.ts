@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 
 import { AuthService } from '../core/auth.service';
 
@@ -16,17 +17,28 @@ import { AuthService } from '../core/auth.service';
         >
           📚
         </div>
-        <p class="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700">
+        <p
+          class="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-700"
+        >
           MCP learning POC
         </p>
         <h1 class="mt-2 text-3xl font-bold text-slate-900">Welcome back</h1>
         <p class="mt-2 text-sm leading-6 text-slate-500">
           Use the demo account configured in the API environment.
         </p>
+        @if (sessionExpired) {
+          <p
+            class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          >
+            Your session expired. Sign in again.
+          </p>
+        }
 
         <form class="mt-8 space-y-5" (ngSubmit)="submit()">
           <label class="block">
-            <span class="mb-2 block text-sm font-semibold text-slate-700">Email</span>
+            <span class="mb-2 block text-sm font-semibold text-slate-700"
+              >Email</span
+            >
             <input
               class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               type="email"
@@ -37,7 +49,9 @@ import { AuthService } from '../core/auth.service';
             />
           </label>
           <label class="block">
-            <span class="mb-2 block text-sm font-semibold text-slate-700">Password</span>
+            <span class="mb-2 block text-sm font-semibold text-slate-700"
+              >Password</span
+            >
             <input
               class="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
               type="password"
@@ -48,7 +62,9 @@ import { AuthService } from '../core/auth.service';
             />
           </label>
           @if (error()) {
-            <p class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ error() }}</p>
+            <p class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {{ error() }}
+            </p>
           }
           <button
             class="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
@@ -64,8 +80,13 @@ import { AuthService } from '../core/auth.service';
 })
 export class LoginPage {
   private readonly auth = inject(AuthService);
+  private readonly route = inject(ActivatedRoute);
   readonly busy = signal(false);
   readonly error = signal('');
+  readonly sessionExpired =
+    this.route.snapshot.queryParamMap.get('reason') === 'expired';
+  private readonly returnUrl =
+    this.route.snapshot.queryParamMap.get('returnUrl') ?? undefined;
   email = '';
   password = '';
 
@@ -76,7 +97,10 @@ export class LoginPage {
     this.busy.set(true);
     this.error.set('');
     try {
-      await this.auth.login({ email: this.email, password: this.password });
+      await this.auth.login(
+        { email: this.email, password: this.password },
+        this.returnUrl,
+      );
     } catch {
       this.error.set('Login failed. Check the demo email and password.');
     } finally {

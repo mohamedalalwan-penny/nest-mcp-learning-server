@@ -13,12 +13,14 @@ import type { Request, Response } from 'express';
 import type { AssistantStreamEvent } from '@books/contracts';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { McpExclude } from '../mcp/mcp-exclude.decorator';
 import { AssistantChatDto } from './assistant.dto';
 import { AssistantService } from './assistant.service';
 
 @ApiTags('Assistant')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
+@McpExclude()
 @Controller('assistant')
 export class AssistantController {
   constructor(private readonly assistant: AssistantService) {}

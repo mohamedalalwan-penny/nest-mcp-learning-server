@@ -1,4 +1,10 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import {
+  DestroyRef,
+  Injectable,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 
 import type {
   AssistantChatRequest,
@@ -6,7 +12,7 @@ import type {
   ChatMessage,
 } from '@books/contracts';
 
-import { AuthService } from '../core/auth.service';
+import { AUTH_SESSION_ENDED_EVENT, AuthService } from '../core/auth.service';
 import { apiUrl } from '../core/api-url';
 import { consumeSseFrames } from './sse';
 
@@ -15,6 +21,7 @@ const CHAT_KEY = 'books-poc-chat';
 @Injectable({ providedIn: 'root' })
 export class ChatStateService {
   private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly messageState = signal<ChatMessage[]>(this.loadMessages());
   private readonly statusState = signal('');
   private readonly busyState = signal(false);
@@ -27,10 +34,19 @@ export class ChatStateService {
   readonly booksVersion = this.booksVersionState.asReadonly();
   readonly hasMessages = computed(() => this.messageState().length > 0);
 
+  constructor() {
+    const clearSessionChat = (): void => this.clear();
+    window.addEventListener(AUTH_SESSION_ENDED_EVENT, clearSessionChat);
+    this.destroyRef.onDestroy(() =>
+      window.removeEventListener(AUTH_SESSION_ENDED_EVENT, clearSessionChat),
+    );
+  }
+
   clear(): void {
     this.abortController?.abort();
     this.messageState.set([]);
     this.statusState.set('');
+    this.busyState.set(false);
     localStorage.removeItem(CHAT_KEY);
   }
 
@@ -40,7 +56,7 @@ export class ChatStateService {
 
   async send(content: string): Promise<void> {
     const query = content.trim();
-    const token = this.auth.token();
+    const token = this.auth.validToken();
     if (!query || !token || this.busyState()) {
       return;
     }
@@ -74,6 +90,10 @@ export class ChatStateService {
         body: JSON.stringify(payload),
         signal: this.abortController.signal,
       });
+      if (response.status === 401) {
+        this.auth.handleUnauthorized();
+        return;
+      }
       if (!response.ok || !response.body) {
         throw new Error(`Assistant request failed with ${response.status}`);
       }

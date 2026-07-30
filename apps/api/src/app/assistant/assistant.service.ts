@@ -2,13 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createVertex } from '@ai-sdk/google-vertex';
 import { createMCPClient } from '@ai-sdk/mcp';
-import { stepCountIs, streamText } from 'ai';
+import { dynamicTool, jsonSchema, stepCountIs, streamText } from 'ai';
 
 import type { AssistantStreamEvent } from '@books/contracts';
 
 import { AssistantChatDto } from './assistant.dto';
-
-const WRITE_TOOLS = new Set(['create_book', 'update_book', 'delete_book']);
 
 @Injectable()
 export class AssistantService {
@@ -39,14 +37,31 @@ export class AssistantService {
     });
 
     try {
-      const [definitions, documentation] = await Promise.all([
-        mcpClient.listTools(),
-        mcpClient.readResource({ uri: 'books://api-docs' }),
-      ]);
-      const tools = mcpClient.toolsFromDefinitions(definitions);
-      const docsText = documentation.contents
-        .map((content) => ('text' in content ? content.text : ''))
-        .join('\n');
+      const definitions = await mcpClient.listTools();
+      const resources = await mcpClient.listResources();
+      const resourceTools = Object.fromEntries(
+        resources.resources.map((resource) => [
+          `read_mcp_resource_${this.toToolName(resource.name)}`,
+          dynamicTool({
+            description: `Read the MCP resource "${resource.title ?? resource.name}". ${resource.description ?? ''}`.trim(),
+            inputSchema: jsonSchema({
+              type: 'object',
+              properties: {},
+              additionalProperties: false,
+            }),
+            execute: () => mcpClient.readResource({ uri: resource.uri }),
+          }),
+        ]),
+      );
+      const tools = {
+        ...mcpClient.toolsFromDefinitions(definitions),
+        ...resourceTools,
+      };
+      const mutationTools = new Set(
+        definitions.tools
+          .filter((tool) => tool.annotations?.readOnlyHint === false)
+          .map((tool) => tool.name),
+      );
       let changedBooks = false;
       let completeText = '';
       let streamError: unknown;
@@ -80,13 +95,13 @@ export class AssistantService {
         messages: input.messages,
         system: `You are a concise books assistant embedded in a learning application.
 
-${docsText}
-
 Rules:
 - Use MCP for every question about the user's live book collection.
 - General greetings and explanations do not need a tool.
 - Never invent a book, ID, status, or successful mutation.
 - A mutation succeeded only when its MCP tool returned a successful result.
+- Read an available MCP documentation resource when the user asks about APIs, tools, endpoints, or capabilities.
+- Respond naturally and conversationally. Explain capabilities through user-friendly examples rather than API terminology unless technical details are requested.
 - Format useful responses as Markdown.
 - Do not expose hidden reasoning, credentials, tool arguments, or implementation secrets.`,
         onToolExecutionStart: ({ toolCall }) => {
@@ -97,9 +112,17 @@ Rules:
           });
         },
         onToolExecutionEnd: ({ toolCall, toolOutput }) => {
+          const output =
+            toolOutput.type === 'tool-result' ? toolOutput.output : undefined;
+          const failed =
+            typeof output === 'object' &&
+            output !== null &&
+            'isError' in output &&
+            output.isError === true;
           if (
             toolOutput.type === 'tool-result' &&
-            WRITE_TOOLS.has(toolCall.toolName)
+            mutationTools.has(toolCall.toolName) &&
+            !failed
           ) {
             changedBooks = true;
           }
@@ -143,5 +166,14 @@ Rules:
     } finally {
       await mcpClient.close();
     }
+  }
+
+  private toToolName(value: string): string {
+    return (
+      value
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase() || 'documentation'
+    );
   }
 }
